@@ -31,14 +31,14 @@ if [ -f "${ENV_DIR}/KONG_GIT_URL" ]
 then
   KONG_GIT_URL=`cat ${ENV_DIR}/KONG_GIT_URL`
 else
-  KONG_GIT_URL="https://github.com/mars/kong.git"
+  KONG_GIT_URL="https://github.com/ericmwalsh/kong.git"
 fi
 # commit or tag to checkout
 if [ -f "${ENV_DIR}/KONG_GIT_COMMITISH" ]
 then
   KONG_GIT_COMMITISH=`cat ${ENV_DIR}/KONG_GIT_COMMITISH`
 else
-  KONG_GIT_COMMITISH="0.7.0-external-supervisor.1"
+  KONG_GIT_COMMITISH="0.8.3-heroku"
 fi
 
 KONG_SOURCE_DIR="${BP_CACHE_DIR}/kong-source"
