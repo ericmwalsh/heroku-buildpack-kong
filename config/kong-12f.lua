@@ -50,6 +50,9 @@ if not cluster_address then
 end
 local cluster_listen    = cluster_address..":"..cluster_port
 
+local serf_log_level    = os.getenv("SERF_LOG_LEVEL") or "err"
+local kong_log_level    = os.getenv("KONG_LOG_LEVEL") or "info"
+
 -- Configure Cassandra using Instaclustr or Heroku-style config vars
 local cassandra_hosts   = {}
 local cassandra_user
@@ -57,6 +60,13 @@ local cassandra_password
 local cassandra_keyspace
 local cassandra_ssl     = false
 local cassandra_cert
+
+-- Configure Postgres
+local postgres_user
+local postgres_password
+local postgres_host
+local postgres_port
+local postgres_database
 
 if os.getenv("IC_CONTACT_POINTS") ~= nil then
   -- Detect Instaclustr from the `IC_CONTACT_POINTS` config var
@@ -85,7 +95,19 @@ elseif os.getenv("CASSANDRA_URL") ~= nil then
     cassandra_keyspace  = keyspace
     table.insert(cassandra_hosts, host)
   end
-  cassandra_cert        = os.getenv("CASSANDRA_TRUSTED_CERT") 
+  cassandra_cert        = os.getenv("CASSANDRA_TRUSTED_CERT")
+elseif os.getenv("DATABASE_URL") ~= nil then
+  -- Default to parsing `DATABASE_URL`,
+  -- a comma-separated list of Heroku-style database URLs
+  local url_pattern     = "postgres://([^:]+):([^@]+)@([^:]+):([^/]+)/([^,]+)"
+  local database_url    = os.getenv("DATABASE_URL")
+  for user, password, host, port, database in string.gmatch(database_url, url_pattern) do
+    postgres_user      = user
+    postgres_password  = password
+    postgres_host      = host
+    postgres_port      = port
+    postgres_database  = database
+  end
 else
   print("Configuration failed: requires `CASSANDRA_URL` or `IC_CONTACT_POINTS` environment variable.")
   eager_fail()
@@ -157,7 +179,13 @@ local values = {
   cassandra_keyspace  = cassandra_keyspace,
   cassandra_ssl       = cassandra_ssl,
   cassandra_cert      = cert_filename,
-  cassandra_replication_factor = cassandra_replication_factor
+  cassandra_replication_factor = cassandra_replication_factor,
+  postgres_user       = postgres_user,
+  postgres_password   = postgres_password,
+  postgres_host       = postgres_host,
+  postgres_port       = postgres_port,
+  postgres_database   = postgres_database,
+  kong_log_level      = kong_log_level
 }
 
 local config = template(values)
@@ -197,6 +225,8 @@ env_file:write("export SERF_CLUSTER_LISTEN="..configuration.cluster_listen.."\n"
 env_file:write("export SERF_CLUSTER_LISTEN_RPC="..configuration.cluster_listen_rpc.."\n")
 env_file:write("export SERF_ENCRYPT="..(configuration.cluster.encrypt or '""').."\n")
 env_file:write("export SERF_NODE_NAME="..cluster_utils.get_node_name(configuration).."\n")
+env_file:write("export SERF_LOG_LEVEL="..serf_log_level.."\n")
+
 -- In the event handler, "kong" value is a copy of hardcoded,
 -- local var `EVENT_NAME` in kong.cli.services.serf
 env_file:write("export SERF_EVENT_HANDLER=".."member-join,member-leave,member-failed,member-update,member-reap,user:kong="..prepared_services.serf._script_path.."\n")
